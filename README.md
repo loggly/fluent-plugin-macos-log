@@ -1,6 +1,6 @@
-# Fluent::Plugin::LogglySyslog
+# Fluent::Plugin::MacOsLogInput
 
-[![Gem Version](https://badge.fury.io/rb/fluent-plugin-macos-log.svg)](https://badge.fury.io/rb/fluent-plugin-macos-log) [![CircleCI](https://circleci.com/gh/solarwinds/fluent-plugin-macos-log/tree/master.svg?style=shield)](https://circleci.com/gh/solarwinds/fluent-plugin-macos-log/tree/master)
+[![Gem Version](https://badge.fury.io/rb/fluent-plugin-macos-log.svg)](https://badge.fury.io/rb/fluent-plugin-macos-log) [![CircleCI](https://circleci.com/gh/loggly/fluent-plugin-macos-log/tree/master.svg?style=shield)](https://circleci.com/gh/loggly/fluent-plugin-macos-log/tree/master)
 
 ## Description
 
@@ -91,8 +91,8 @@ To release a new version, update the version number in the [GemSpec](fluent-plug
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at: https://github.com/solarwinds/fluent-plugin-macos-log
+Bug reports and pull requests are welcome on GitHub at: https://github.com/loggly/fluent-plugin-macos-log
 
 # Questions/Comments?
 
-Please [open an issue](https://github.com/solarwinds/fluent-plugin-macos-log/issues/new), we'd love to hear from you.
+Please [open an issue](https://github.com/loggly/fluent-plugin-macos-log/issues/new), we'd love to hear from you.

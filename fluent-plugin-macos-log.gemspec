@@ -10,8 +10,8 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{Fluentd input plugin for MacOS unified log}
   spec.description   = %q{Fluentd input from MacOS unified log}
-  spec.homepage      = "https://github.com/solarwinds/fluent-plugin-macos-log"
-  spec.license       = "Apache-2.0"
+  spec.homepage      = "https://github.com/loggly/fluent-plugin-macos-log"
+  spec.license       = "MIT"
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
