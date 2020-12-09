@@ -13,10 +13,13 @@ module Fluent::Plugin
       super
       @pf_file = nil
       @log_start_regex = nil
+      @compiled_command = nil
     end
 
     desc 'The command (program) to execute.'
-    config_param :command, :string
+    config_param :command, :string, default: 'log show --style syslog --start @%s --end @%s'
+    desc 'The unified log filter predicate as per Apple\'s documentation'
+    config_param :predicate, :string, default: nil
     desc 'Specify connect mode to executed process'
     config_param :connect_mode, :enum, list: [:read, :read_with_stderr], default: :read
 
@@ -47,6 +50,12 @@ module Fluent::Plugin
 
       unless @tag
         raise Fluent::ConfigError, "'tag' option is required on macoslog input"
+      end
+
+      if conf["predicate"]
+        @compiled_command = "#{@command} --predicate '#{conf['predicate']}'"
+      else
+        @compiled_command = @command
       end
 
       @parser = parser_create
@@ -90,7 +99,7 @@ module Fluent::Plugin
       }
 
       timer_process_execute(:exec_input,
-                            @command,
+                            @compiled_command,
                             start, @run_interval,
                             time_callback,
                             immediate: true, mode: [@connect_mode], &method(:run))

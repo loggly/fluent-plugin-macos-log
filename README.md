@@ -29,7 +29,7 @@ To configure this in fluentd:
     @type macoslog
     command log show --style syslog --predicate 'process == "sharingd"' --start @%s --end @%s
     tag macos
-    pos_file last-starttime.log
+    pos_file /path/to/position/file
     run_interval 10s
 </source>
 ```
@@ -37,23 +37,54 @@ To configure this in fluentd:
 The command should be `log show --style syslog --start @%s --end @%s` in order to combine multiple lines and iterate over
 each period of time. Notice the `start` and `end` parameters use `@`, which is notation for unix timestamp format, used by plugin.
 
+Optionally the plugin uses position file, where it records last processed timestamp. Whenever the `fluentd` process
+restarts the plugin picks up from the last position. When no position files is used the plugin starts from current time
+and keeps last position only in memory.
+
 Optionally one can configure any `predicate` to filter required logs.
 
 ### Advanced Configuration
 This plugin inherits Fluentd's standard input parameters.
 
 * `command` - external command to be executed for each interval. The command's first parameter noted ruby's `%s` as start
-unix timestamp and the second `%s` for end timestamp.
+unix timestamp and the second `%s` for end timestamp. Default: `log show --style syslog --start @%s --end @%s`
+* `predicate` - log filter predicate as per Apple's documentation. Default: `nil`
 * `connect_mode` - Control target IO:
   * `read`: Read logs from stdio
   * `read_with_stderr`: Read logs from stdio and stderr (mainly for debug).
-* `parser` section - Refer these for more details about parse section
+* `parser` section - Refer these for more details about parse section. Default `regexp`
 * `tag` - The tag of the output events.
 * `run_interval` - The interval time between periodic program runs.
 * `pos_file` - Fluentd will record the position it last read from external command.
   Don't share pos_file between in_macoslog configurations. It causes unexpected behavior e.g. corrupt pos_file content.
-* `log_line_start` - Regexp of start of the log to combine multiline logs.
-* `log_header_lines` - Number of header lines to skip when parsing.
+* `log_line_start` - Regexp of start of the log to combine multiline logs. Default: `\d+-\d+-\d+\s+\d+:\d+:\d+[^ ]+`
+* `log_header_lines` - Number of header lines to skip when parsing. Default: `1`
+
+### Example
+Example configuration for sending logs over to Loggly. The input plugin collects unified logs with filter `process == "sharingd"`
+every `10s` while recording position in file `/path/to/position/file`.
+
+It uses [fluent-plugin-loggly](https://github.com/patant/fluent-plugin-loggly) in buffer mode.
+
+```xml
+<source>
+  @type macoslog
+  predicate process == "sharingd"
+  tag macos
+  pos_file /path/to/position/file
+  run_interval 10s
+</source>
+
+<match macos>
+  type loggly_buffered
+  loggly_url https://logs-01.loggly.com/bulk/xxx-xxxx-xxxx-xxxxx-xxxxxxxxxx
+  output_include_time true
+  time_precision_digits 3
+  buffer_type    file
+  buffer_path    /path/to/buffer/file
+  flush_interval 10s
+</match>
+```
 
 ## Development
 
