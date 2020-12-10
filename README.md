@@ -54,6 +54,8 @@ unix timestamp and the second `%s` for end timestamp. Default: `log show --style
   * [no-]info                   Control whether "Info" events are shown
   * [no-]loss                   Control whether message loss events are shown
   * [no-]signpost               Control whether signposts are shown
+* `style` - Controls style of logging tool output.
+  * `ndjson` - single lined json format output. When used, the json parser must be configured. 
 * `connect_mode` - Control target IO:
   * `read`: Read logs from stdio
   * `read_with_stderr`: Read logs from stdio and stderr (mainly for debug).
@@ -104,6 +106,27 @@ It uses output [fluent-plugin-loggly](https://github.com/patant/fluent-plugin-lo
   buffer_path    /path/to/buffer/file
   flush_interval 10s
 </match>
+```
+
+#### Detail log
+Very detail log can be fetched from `log` utility using `ndjson` style. As such the parser needs to be changed
+as well to `json` type. As this changes an output of the `log` parameter `log_header_lines` refers to number
+of lines from the bottom to be skipped (those contain statistics).
+
+```xml
+<source>
+  @type macoslog
+  style ndjson
+  tag macos
+  pos_file last-starttime.log
+  run_interval 10s
+  <parse>
+    @type json
+    time_type string
+    time_key timestamp
+    time_format %Y-%m-%d %H:%M:%S.%L%z
+  </parse>
+</source>
 ```
 
 ## Development
