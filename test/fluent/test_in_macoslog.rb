@@ -27,14 +27,14 @@ class MacOsLogInputTest < Test::Unit::TestCase
                     [event_time("2020-12-08 14:36:12.236613+0100"),
                      event_time("2020-12-08 14:36:12.236773+0100"),
                      event_time("2020-12-08 14:36:12.236781+0100")],
-                    [{"host"=>"localhost", "ident"=>"sharingd", "message"=> "[com.apple.sharing:Handoff] Request to advertise <a1072cb8bf1d9858f7> with options {SFActivityAdvertiserOptionFlagCopyPasteKey = 1;SFActivityAdvertiserOptionMinorVersionKey = 0;SFActivityAdvertiserOptionVersionKey = 0;}", "pid"=>"683"},
-                     {"host"=>"localhost", "ident"=>"sharingd", "message"=>
+                    [{"thread"=>"0x13d4", "level"=>"Default", "activity"=>"0x0", "ttl"=>"3", "process"=>"sharingd", "message"=> "[com.apple.sharing:Handoff] Request to advertise <a1072cb8bf1d9858f7> with options {SFActivityAdvertiserOptionFlagCopyPasteKey = 1;SFActivityAdvertiserOptionMinorVersionKey = 0;SFActivityAdvertiserOptionVersionKey = 0;}", "pid"=>"683"},
+                     {"thread"=>"0x13d4", "level"=>"Error", "activity"=>"0x0", "ttl"=>"2", "process"=>"sharingd", "message"=>
                         "[com.apple.sharing:Handoff] Started advertising <a1072cb8bf1d9858f7> as <08915409f541712ad630460d1a2c> with options {\n" +
                           "    SFActivityAdvertiserOptionFlagCopyPasteKey = 1;\n" +
                           "    SFActivityAdvertiserOptionMinorVersionKey = 0;\n" +
                           "    SFActivityAdvertiserOptionVersionKey = 0;\n" +
-                          "}", "pid"=>"683"},
-                     {"host"=>"localhost", "ident"=>"sharingd", "message"=> "[com.apple.sharing:Handoff] Trying to grab power assertion while we already have one", "pid"=>"683"}]
+                          "}", "pid"=>"500"},
+                     {"thread"=>"0x13d4", "level"=>"Info", "activity"=>"0x0", "ttl"=>"1", "process"=>"sharingd", "message"=> "[com.apple.sharing:Handoff] Trying to grab power assertion while we already have one", "pid"=>"404"}]
       ]
   )
   test 'emit with formats' do |data|

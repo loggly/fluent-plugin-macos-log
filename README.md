@@ -20,21 +20,20 @@ gem install fluent-plugin-macos-log
 This is a process execution input plugin for Fluentd that periodically executes external `log show` command and parses log events into Fluentd's core system.
 Each execution alters `start` and `end` time input parameters of log utility to slowly iterates over log data. The iteration
 interval can be configured by user, but cannot be lower than 1s. The process output is than parsed using `regexp` parser
-and logic, which combines multiple lines together. The parameter `log_line_start` defines regular expresion, which matches to
+and logic, which combines multiple lines together. The parameter `log_line_start` defines regular expresion, which matches the
 beginning of line. Anything in between will be merged into single log entry. Although the parser is `regexp`, user can select any other supported parser.
 
 To configure this in fluentd:
 ```xml
 <source>
-    @type macoslog
-    command log show --style syslog --predicate 'process == "sharingd"' --start @%s --end @%s
-    tag macos
-    pos_file /path/to/position/file
-    run_interval 10s
+  @type macoslog
+  tag macos
+  pos_file /path/to/position/file
+  run_interval 10s
 </source>
 ```
 
-The command should be `log show --style syslog --start @%s --end @%s` in order to combine multiple lines and iterate over
+The command should be `log show --style default --start @%s --end @%s` in order to combine multiple lines and iterate over
 each period of time. Notice the `start` and `end` parameters use `@`, which is notation for unix timestamp format, used by plugin.
 
 Optionally the plugin uses position file, where it records last processed timestamp. Whenever the `fluentd` process
@@ -47,8 +46,14 @@ Optionally one can configure any `predicate` to filter required logs.
 This plugin inherits Fluentd's standard input parameters.
 
 * `command` - external command to be executed for each interval. The command's first parameter noted ruby's `%s` as start
-unix timestamp and the second `%s` for end timestamp. Default: `log show --style syslog --start @%s --end @%s`
+unix timestamp and the second `%s` for end timestamp. Default: `log show --style default --start @%s --end @%s`
 * `predicate` - log filter predicate as per Apple's documentation. Default: `nil`
+* `levels` - Controls what logging levels will be shown. Supported by `log` command:
+  * [no-]backtrace              Control whether backtraces are shown
+  * [no-]debug                  Control whether "Debug" events are shown
+  * [no-]info                   Control whether "Info" events are shown
+  * [no-]loss                   Control whether message loss events are shown
+  * [no-]signpost               Control whether signposts are shown
 * `connect_mode` - Control target IO:
   * `read`: Read logs from stdio
   * `read_with_stderr`: Read logs from stdio and stderr (mainly for debug).
@@ -60,11 +65,26 @@ unix timestamp and the second `%s` for end timestamp. Default: `log show --style
 * `log_line_start` - Regexp of start of the log to combine multiline logs. Default: `\d+-\d+-\d+\s+\d+:\d+:\d+[^ ]+`
 * `log_header_lines` - Number of header lines to skip when parsing. Default: `1`
 
+One can configure own parser:
+```xml
+<source>
+  @type macoslog
+  tag macos
+  pos_file /path/to/position/file
+  run_interval 10s
+  <parse>
+    @type tsv
+    keys avg1,avg5,avg15
+    delimiter " "
+  </parse>
+</source>
+```
+
 ### Example
 Example configuration for sending logs over to Loggly. The input plugin collects unified logs with filter `process == "sharingd"`
 every `10s` while recording position in file `/path/to/position/file`.
 
-It uses [fluent-plugin-loggly](https://github.com/patant/fluent-plugin-loggly) in buffer mode.
+It uses output [fluent-plugin-loggly](https://github.com/patant/fluent-plugin-loggly) configured in buffer mode.
 
 ```xml
 <source>

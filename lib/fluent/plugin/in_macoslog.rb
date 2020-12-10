@@ -17,15 +17,17 @@ module Fluent::Plugin
     end
 
     desc 'The command (program) to execute.'
-    config_param :command, :string, default: 'log show --style syslog --start @%s --end @%s'
+    config_param :command, :string, default: 'log show --style default --start @%s --end @%s'
     desc 'The unified log filter predicate as per Apple\'s documentation'
     config_param :predicate, :string, default: nil
     desc 'Specify connect mode to executed process'
     config_param :connect_mode, :enum, list: [:read, :read_with_stderr], default: :read
+    desc 'Logging levels supported by Unified Logging ([no-]backtrace, [no-]debug, [no-]info, [no-]loss, [no-]signpost)'
+    config_param :levels, :array, default: [], value_type: :string
 
     config_section :parse do
       config_set_default :@type, 'regexp'
-      config_set_default :expression, /^(?<logtime>[\d\.:\- \+]+)  (?<host>[^ ]*) (?<ident>[^ :\[]*)(?:\[(?<pid>[0-9]+)\])?(?:[^\:]*\:)? *(?<message>.*)$/m
+      config_set_default :expression, /^(?<logtime>[\d\-]+\s*[\d\.:\+]+)\s+(?<thread>[^ ]*)\s+(?<level>[^ ]+)\s+(?<activity>[^ ]*)\s+(?<pid>[0-9]+)\s+(?<ttl>[0-9]+)\s+(?<process>[^ :]*)(?:[^\:]*\:)\s*(?<message>.*)$/m
       config_set_default :time_key, 'logtime'
       config_set_default :time_format, '%Y-%m-%d %H:%M:%S.%L%z'
     end
@@ -52,11 +54,18 @@ module Fluent::Plugin
         raise Fluent::ConfigError, "'tag' option is required on macoslog input"
       end
 
+      @compiled_command = @command
+
       if conf["predicate"]
-        @compiled_command = "#{@command} --predicate '#{conf['predicate']}'"
-      else
-        @compiled_command = @command
+        @compiled_command += " --predicate '#{conf['predicate']}'"
       end
+
+      if @levels.length > 0
+        compiled_level = @levels.map { |level| "--#{level}" }.join(" ")
+        @compiled_command += " #{compiled_level}"
+      end
+
+      $log.info "MacOs log command '#{@compiled_command}'"
 
       @parser = parser_create
 
