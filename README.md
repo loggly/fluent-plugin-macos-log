@@ -19,10 +19,14 @@ gem install fluent-plugin-macos-log
 
 This is a process execution input plugin for Fluentd that periodically executes external `log show` command and parses log events into Fluentd's core system.
 Each execution alters `start` and `end` time input parameters of log utility to slowly iterates over log data. The iteration
-interval can be configured by user, but cannot be lower than 1s. The process output is than parsed using `regexp` parser
+interval can be configured by user, but cannot be lower than 1s.
+
+There are multiple configurations one can use:
+
+#### Simplified Output
+Uses human-readable output of the command. The process output is parsed using `regexp` parser
 and logic, which combines multiple lines together. The parameter `log_line_start` defines regular expresion, which matches the
 beginning of line. Anything in between will be merged into single log entry. Although the parser is `regexp`, user can select any other supported parser.
-
 To configure this in fluentd:
 ```xml
 <source>
@@ -33,7 +37,29 @@ To configure this in fluentd:
 </source>
 ```
 
-The command should be `log show --style default --start @%s --end @%s` in order to combine multiple lines and iterate over
+#### Detail Output
+Use when more detailed output is required. It uses `nsjson` style of `log` command, which is then parsed by json parser.
+To configure this in fluentd:
+```xml
+<source>
+  @type macoslog
+  style ndjson
+  tag macos
+  pos_file last-starttime.log
+  run_interval 10s
+  <parse>
+    @type json
+    time_type string
+    time_key timestamp
+    time_format %Y-%m-%d %H:%M:%S.%L%z
+  </parse>
+</source>
+```
+
+### Advanced Configuration
+This plugin inherits Fluentd's standard input parameters.
+
+The command used by default is `log show --style default --start @%s --end @%s` in order to combine multiple lines and iterate over
 each period of time. Notice the `start` and `end` parameters use `@`, which is notation for unix timestamp format, used by plugin.
 
 Optionally the plugin uses position file, where it records last processed timestamp. Whenever the `fluentd` process
@@ -41,9 +67,6 @@ restarts the plugin picks up from the last position. When no position files is u
 and keeps last position only in memory.
 
 Optionally one can configure any `predicate` to filter required logs.
-
-### Advanced Configuration
-This plugin inherits Fluentd's standard input parameters.
 
 * `command` - external command to be executed for each interval. The command's first parameter noted ruby's `%s` as start
 unix timestamp and the second `%s` for end timestamp. Default: `log show --style default --start @%s --end @%s`
@@ -65,7 +88,8 @@ unix timestamp and the second `%s` for end timestamp. Default: `log show --style
 * `pos_file` - Fluentd will record the position it last read from external command.
   Don't share pos_file between in_macoslog configurations. It causes unexpected behavior e.g. corrupt pos_file content.
 * `log_line_start` - Regexp of start of the log to combine multiline logs. Default: `\d+-\d+-\d+\s+\d+:\d+:\d+[^ ]+`
-* `log_header_lines` - Number of header lines to skip when parsing. Default: `1`
+* `log_header_lines` - Number of header lines to skip when parsing. When `ndjson` style used the parameter refers
+  to number of footer lines to be skipped. Default: `1`
 
 One can configure own parser:
 ```xml
@@ -106,27 +130,6 @@ It uses output [fluent-plugin-loggly](https://github.com/patant/fluent-plugin-lo
   buffer_path    /path/to/buffer/file
   flush_interval 10s
 </match>
-```
-
-#### Detail log
-Very detail log can be fetched from `log` utility using `ndjson` style. As such the parser needs to be changed
-as well to `json` type. As this changes an output of the `log` parameter `log_header_lines` refers to number
-of lines from the bottom to be skipped (those contain statistics).
-
-```xml
-<source>
-  @type macoslog
-  style ndjson
-  tag macos
-  pos_file last-starttime.log
-  run_interval 10s
-  <parse>
-    @type json
-    time_type string
-    time_key timestamp
-    time_format %Y-%m-%d %H:%M:%S.%L%z
-  </parse>
-</source>
 ```
 
 ## Development

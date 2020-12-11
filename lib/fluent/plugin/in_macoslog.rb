@@ -17,7 +17,7 @@ module Fluent::Plugin
     end
 
     desc 'The command (program) to execute.'
-    config_param :command, :string, default: 'log show --start @%s --end @%s'
+    config_param :command, :string, default: 'log show --style default --start @%s --end @%s'
     desc 'The unified log filter predicate as per Apple\'s documentation'
     config_param :predicate, :string, default: nil
     desc 'Specify connect mode to executed process'
@@ -25,7 +25,7 @@ module Fluent::Plugin
     desc 'Logging levels supported by Unified Logging ([no-]backtrace, [no-]debug, [no-]info, [no-]loss, [no-]signpost)'
     config_param :levels, :array, default: [], value_type: :string
     desc 'Output formatting of events from logging tool'
-    config_param :style, :enum, list: [:default, :syslog, :json, :ndjson, :compact], default: :default
+    config_param :style, :enum, list: [:default, :syslog, :ndjson, :compact], default: nil
 
     config_section :parse do
       config_set_default :@type, 'regexp'
@@ -56,16 +56,7 @@ module Fluent::Plugin
         raise Fluent::ConfigError, "'tag' option is required on macoslog input"
       end
 
-      @compiled_command = "#{@command} --style #{@style}"
-
-      if conf["predicate"]
-        @compiled_command += " --predicate '#{conf['predicate']}'"
-      end
-
-      if @levels.length > 0
-        compiled_level = @levels.map { |level| "--#{level}" }.join(" ")
-        @compiled_command += " #{compiled_level}"
-      end
+      @compiled_command = compile_command
 
       $log.info "MacOs log command '#{@compiled_command}'"
 
@@ -77,6 +68,25 @@ module Fluent::Plugin
       end
 
       @log_start_regex = Regexp.compile("\\A#{@log_line_start}")
+    end
+
+    def compile_command
+      result = @command
+
+      if @style
+        result += " --style #{@style}"
+      end
+
+      if @predicate
+        result += " --predicate '#{@predicate}'"
+      end
+
+      if @levels.length > 0
+        compiled_level = @levels.map { |level| "--#{level}" }.join(" ")
+        result += " #{compiled_level}"
+      end
+
+      result
     end
 
     def multi_workers_ready?
@@ -113,6 +123,7 @@ module Fluent::Plugin
                             @compiled_command,
                             start, @run_interval,
                             time_callback,
+                            delay_seconds: 1,
                             immediate: true, mode: [@connect_mode], &method(:run))
     end
 
