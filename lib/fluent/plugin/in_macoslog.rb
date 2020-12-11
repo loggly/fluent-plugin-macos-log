@@ -17,17 +17,19 @@ module Fluent::Plugin
     end
 
     desc 'The command (program) to execute.'
-    config_param :command, :string, default: 'log show --style default --start @%s --end @%s'
+    config_param :command, :string, default: 'log show --start @%s --end @%s'
     desc 'The unified log filter predicate as per Apple\'s documentation'
     config_param :predicate, :string, default: nil
     desc 'Specify connect mode to executed process'
     config_param :connect_mode, :enum, list: [:read, :read_with_stderr], default: :read
     desc 'Logging levels supported by Unified Logging ([no-]backtrace, [no-]debug, [no-]info, [no-]loss, [no-]signpost)'
     config_param :levels, :array, default: [], value_type: :string
+    desc 'Output formatting of events from logging tool'
+    config_param :style, :enum, list: [:default, :syslog, :ndjson, :compact], default: nil
 
     config_section :parse do
       config_set_default :@type, 'regexp'
-      config_set_default :expression, /^(?<logtime>[\d\-]+\s*[\d\.:\+]+)\s+(?<thread>[^ ]*)\s+(?<level>[^ ]+)\s+(?<activity>[^ ]*)\s+(?<pid>[0-9]+)\s+(?<ttl>[0-9]+)\s+(?<process>[^ :]*)(?:[^\:]*\:)\s*(?<message>.*)$/m
+      config_set_default :expression, /^(?<logtime>[\d\-]+\s*[\d\.:\+]+)\s+(?<thread>[^ ]*)\s+(?<level>[^ ]+)\s+(?<activity>[^ ]*)\s+(?<pid>[0-9]+)\s+(?<ttl>[0-9]+)\s+(?<process>[^:]*)(?:[^\:]*\:)\s*(?<message>.*)$/m
       config_set_default :time_key, 'logtime'
       config_set_default :time_format, '%Y-%m-%d %H:%M:%S.%L%z'
     end
@@ -42,6 +44,8 @@ module Fluent::Plugin
     config_param :log_line_start, :string, default: '\d+-\d+-\d+\s+\d+:\d+:\d+[^ ]+'
     desc 'Number of header lines to be skipped. Use negative value if no header'
     config_param :log_header_lines, :integer, default: 1
+    desc 'Max age of logs to be inputted'
+    config_param :max_age, :time, default: 259200 #3d
 
     attr_reader :parser
 
@@ -54,16 +58,7 @@ module Fluent::Plugin
         raise Fluent::ConfigError, "'tag' option is required on macoslog input"
       end
 
-      @compiled_command = @command
-
-      if conf["predicate"]
-        @compiled_command += " --predicate '#{conf['predicate']}'"
-      end
-
-      if @levels.length > 0
-        compiled_level = @levels.map { |level| "--#{level}" }.join(" ")
-        @compiled_command += " #{compiled_level}"
-      end
+      @compiled_command = compile_command
 
       $log.info "MacOs log command '#{@compiled_command}'"
 
@@ -75,6 +70,27 @@ module Fluent::Plugin
       end
 
       @log_start_regex = Regexp.compile("\\A#{@log_line_start}")
+    end
+
+    def compile_command
+      result = @command
+
+      if @style
+        result += " --style #{@style}"
+      elsif not result =~ /"--style"/
+        result += " --style default"
+      end
+
+      if @predicate
+        result += " --predicate '#{@predicate}'"
+      end
+
+      if @levels.length > 0
+        compiled_level = @levels.map { |level| "--#{level}" }.join(" ")
+        result += " #{compiled_level}"
+      end
+
+      result
     end
 
     def multi_workers_ready?
@@ -92,12 +108,18 @@ module Fluent::Plugin
 
         start = @pf_file.read.to_i
         if start == 0
-          start = Fluent::EventTime.now.to_s
+          start = Fluent::EventTime.now.to_int
           @pf_file.write(start)
         end
       else
-        start = Fluent::EventTime.now.to_s
+        start = Fluent::EventTime.now.to_int
         @pf_file.write(start) if @pf_file
+      end
+
+      oldest = Fluent::EventTime.now.to_int - @max_age.to_i
+      if start < oldest
+        log.info "Start timestamp over max_age ", start: start, oldest: oldest
+        start = oldest
       end
 
       time_callback = -> (timestamp) {
@@ -111,6 +133,7 @@ module Fluent::Plugin
                             @compiled_command,
                             start, @run_interval,
                             time_callback,
+                            delay_seconds: 1,
                             immediate: true, mode: [@connect_mode], &method(:run))
     end
 
@@ -122,26 +145,44 @@ module Fluent::Plugin
 
     def run(io)
       unless io.eof
-        log = ""
-        io.each_line.with_index do |line,index|
-          # Skips log header
-          if index >= @log_header_lines
-            if line =~ @log_start_regex
-              if log.empty?
-                log = line
-              else
-                @parser.parse(log.chomp("\n"), &method(:on_record))
-                log = line
-              end
+        if @style == :ndjson
+          parse_line_json(io)
+        else
+          parse_timestamp_base(io)
+        end
+      end
+    end
+
+    def parse_line_json(io)
+      logs = Queue.new
+      io.each_line.with_index do |line,index|
+        logs.push(line.chomp("\n"))
+        if index >= @log_header_lines
+          @parser.parse(logs.pop, &method(:on_record))
+        end
+      end
+    end
+
+    def parse_timestamp_base(io)
+      log = ""
+      io.each_line.with_index do |line,index|
+        # Skips log header
+        if index >= @log_header_lines
+          if line =~ @log_start_regex
+            if log.empty?
+              log = line
             else
-              log += line
+              @parser.parse(log.chomp("\n"), &method(:on_record))
+              log = line
             end
+          else
+            log += line
           end
         end
+      end
 
-        unless log.empty?
-          @parser.parse(log.chomp("\n"), &method(:on_record))
-        end
+      unless log.empty?
+        @parser.parse(log.chomp("\n"), &method(:on_record))
       end
     end
 

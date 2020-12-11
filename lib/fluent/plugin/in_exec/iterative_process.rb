@@ -12,7 +12,7 @@ module Fluent
         arguments: nil, subprocess_name: nil, immediate: false, parallel: false,
         mode: [:read, :write], stderr: :discard, env: {}, unsetenv: false, chdir: nil,
         internal_encoding: 'utf-8', external_encoding: 'ascii-8bit', scrub: true, replace_string: nil,
-        wait_timeout: nil, on_exit_callback: nil,
+        wait_timeout: nil, on_exit_callback: nil, delay_seconds: 0,
         &block
       )
         raise ArgumentError, "BUG: title must be a symbol" unless title.is_a? Symbol
@@ -46,7 +46,7 @@ module Fluent
           )
         }
 
-        now = Fluent::EventTime.now.to_int
+        now = Fluent::EventTime.now.to_int - delay_seconds
         if immediate && start_timestamp.to_i < now
           execute_child_process.call(command % [start_timestamp, now])
           start_timestamp = now
@@ -57,7 +57,7 @@ module Fluent
           if !parallel && running
             log.warn "previous child process is still running. skipped.", title: title, command: command, arguments: arguments, interval: interval
           else
-            end_timestamp = Fluent::EventTime.now.to_s
+            end_timestamp = Fluent::EventTime.now.to_int - delay_seconds
             execute_child_process.call(command % [start_timestamp, end_timestamp])
             start_timestamp = end_timestamp
             time_callback.call(start_timestamp)
