@@ -2,41 +2,53 @@
 #
 # Check https://circleci.com/docs/2.0/language-ruby/ for more details
 #
-version: 2
+version: 2.1
+
+executors:
+  ruby:
+    docker:
+      - image: circleci/ruby:2.6.6-node
+    environment:
+      BUNDLER_VERSION: 2.1.4
+      REPO_NAME: "fluent-plugin-macos-log"
+      BUNDLE_PATH: "vendor/bundle"
+      VERSION_FILE: "version.txt"
+
+references:
+  depends_cache_key: &depends_cache_key
+                       v1-dependencies-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+  fallback_repo_cache_key: &fallback_repo_cache_key
+                             v1-dependencies-
+  restore_deps: &restore_deps
+    restore_cache:
+      keys:
+        - *depends_cache_key
+        - *fallback_repo_cache_key
+  save_deps: &save_deps
+    save_cache:
+      paths:
+        - ./vendor/bundle
+      key: *depends_cache_key
+  install_bundler: &install_bundler
+    run:
+      name: Install bundler
+      command: gem install bundler:$BUNDLER_VERSION
+
 jobs:
   build:
-    docker:
-      - image: circleci/ruby:2.6.0-node
-        environment:
-          BUNDLER_VERSION: 2.0.2
-
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
-
+    executor: ruby
     working_directory: ~/repo
-
     steps:
       - checkout
 
       # Download and cache dependencies
-      - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "Gemfile.lock" }}
-            # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-
+      - *restore_deps
+      - *install_bundler
       - run:
-          name: install dependencies
-          command: |
-            gem install bundler:2.0.2
-            bundle install --jobs=4 --retry=3 --path vendor/bundle
+          name: Install dependencies
+          command: bundle install --jobs=4 --retry=3
 
-      - save_cache:
-          paths:
-            - ./vendor/bundle
-          key: v1-dependencies-{{ checksum "Gemfile.lock" }}
+      - *save_deps
 
       # run tests!
       - run:
@@ -51,3 +63,80 @@ jobs:
       - store_artifacts:
           path: /tmp/test-results
           destination: test-results
+
+  release:
+    executor: ruby
+    working_directory: ~/repo
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "a5:d3:86:70:21:30:78:71:87:a7:45:34:0a:47:f6:5c"
+      - checkout
+      - *restore_deps
+      - *install_bundler
+      - run:
+          name: Ruby version
+          command: |
+            ruby --version
+            gem env version
+            bundle --version
+      - run:
+          name: Configure git for release
+          command: |
+            git config user.name "librato-ci"
+            git config user.email "tools+librato-ci-githublibrato.com"
+      - run:
+          name: Prepare release
+          command: |
+            sed -i'' 's/\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1.\2.\3/g' $VERSION_FILE
+            GITTAG=$(cat $VERSION_FILE)
+            git add $VERSION_FILE
+            git commit -m "[ci skip] prepare release $GITTAG"
+            git push --set-upstream origin $CIRCLE_BRANCH
+            git tag $GITTAG
+            git push origin $GITTAG
+      - run:
+          name: Generate gem credentials
+          command: |
+            mkdir -p ~/.gem
+            echo -e "---\r\n:rubygems_api_key: $RUBYGEMS_API_KEY" > ~/.gem/credentials
+            chmod 0600 ~/.gem/credentials
+      - run:
+          name: Perform build
+          command: |
+            rm -rf ${REPO_NAME}-*.gem
+            bundle exec gem build ${REPO_NAME}.gemspec
+      - run:
+          name: Perform publish
+          command: |
+            bundle exec gem push ${REPO_NAME}-*.gem
+      - run:
+          name: Prepare next release version
+          command: |
+            VERSION=$(cat $VERSION_FILE | xargs)
+            if [[ $VERSION =~ ^(.*)(([0-9]+)\.([0-9]+)\.([0-9]+))(-.*)? ]]; then
+              SEMVERMAJOR=${BASH_REMATCH[3]}
+              SEMVERMINOR=${BASH_REMATCH[4]}
+              SEMVERPATCH=$(expr ${BASH_REMATCH[5]} + 1)
+              NEWVERSION="${SEMVERMAJOR}.${SEMVERMINOR}.${SEMVERPATCH}.beta.1"
+              echo "$NEWVERSION" > $VERSION_FILE
+              git add $VERSION_FILE Gemfile.lock
+              git commit -m "[ci skip] prepare for next development iteration"
+              git push --set-upstream origin $CIRCLE_BRANCH
+            fi
+      - run:
+          name: Clean credentials
+          command: shred -u ~/.gem/credentials
+          when: always
+
+workflows:
+  build_test_release:
+    jobs:
+      - build
+      - release:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - build
