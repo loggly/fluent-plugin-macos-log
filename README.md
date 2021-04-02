@@ -1,6 +1,6 @@
 # Fluent::Plugin::MacOsLogInput
 
-[![Gem Version](https://badge.fury.io/rb/fluent-plugin-macos-log.svg)](https://badge.fury.io/rb/fluent-plugin-macos-log) [![CircleCI](https://circleci.com/gh/loggly/fluent-plugin-macos-log/tree/master.svg?style=shield)](https://circleci.com/gh/loggly/fluent-plugin-macos-log/tree/master)
+[![Gem Version](https://badge.fury.io/rb/fluent-plugin-macos-log.svg)](https://badge.fury.io/rb/fluent-plugin-macos-log) [![CircleCI](https://circleci.com/gh/loggly/fluent-plugin-macos-log/tree/master.svg?style=shield&circle-token=40ba8c07eb6c015b66e1c9fbf939dcf46ca69099)](https://circleci.com/gh/loggly/fluent-plugin-macos-log/tree/master)
 
 ## Description
 
