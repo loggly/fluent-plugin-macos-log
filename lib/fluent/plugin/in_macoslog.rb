@@ -29,7 +29,8 @@ module Fluent::Plugin
 
     config_section :parse do
       config_set_default :@type, 'regexp'
-      config_set_default :expression, /^(?<logtime>[\d\-]+\s*[\d\.:\+]+)\s+(?<thread>[^ ]*)\s+(?<level>[^ ]+)\s+(?<activity>[^ ]*)\s+(?<pid>[0-9]+)\s+(?<ttl>[0-9]+)\s+(?<process>[^:]*)(?:[^\:]*\:)\s*(?<message>.*)$/m
+      config_set_default :expression, '/^(?<logtime>[\d\-]+\s*[\d\.:\+]+)\s+(?<thread>[^ ]*)\s+(?<level>[^ ]+)\s+(?<activity>[^ ]*)\s+(?<pid>[0-9]+)\s+(?<ttl>[0-9]+)\s+(?<process>[^:]*)(?:[^\:]*\:)\s*(?<message>.*)$/'
+      config_set_default :multiline, true
       config_set_default :time_key, 'logtime'
       config_set_default :time_format, '%Y-%m-%d %H:%M:%S.%L%z'
     end
